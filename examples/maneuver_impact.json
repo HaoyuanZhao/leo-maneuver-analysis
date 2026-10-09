@@ -1,0 +1,22 @@
+{
+  "backend": "scipy-j2",
+  "num_planes": 3,
+  "satellites_per_plane": 12,
+  "altitude_m": 550000.0,
+  "inclination_deg": 53.0,
+  "duration_s": 1800.0,
+  "sample_step_s": 30.0,
+  "integrator_step_s": 30.0,
+  "maneuver_time_s": 600.0,
+  "maneuver_satellite_id": 3,
+  "impulse_rtn_mps": [0.0, 0.2, 0.0],
+  "source_satellite_id": 0,
+  "destination_satellite_id": 6,
+  "max_isl_distance_m": 5014000.0,
+  "isl_degree_cap": 4,
+  "nominal_capacity_mbps": 1000.0,
+  "beam_width_rad": 0.00005,
+  "nominal_snr_linear": 100.0,
+  "packet_bits": 12000,
+  "max_retransmission_factor": 20.0
+}

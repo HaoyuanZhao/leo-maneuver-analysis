@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leo-maneuver-analysis"
+version = "0.1.0"
+description = "Offline analysis of prescribed LEO maneuvers and inter-satellite links"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Haoyuan Zhao"}]
+dependencies = ["numpy>=1.26,<3", "scipy>=1.11,<2", "networkx>=3.2,<4"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8,<4"]
+basilisk = ["bsk==2.11.1"]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+leo-maneuver = "leo_maneuver_analysis.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["basilisk: optional Basilisk backend checks"]
