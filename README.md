@@ -4,7 +4,7 @@ Python code for studying how a satellite maneuver affects inter-satellite pointi
 
 The simulation starts from the same constellation and compares two cases: one without a maneuver and one with a velocity impulse. Both use the same route, and terminal pointing continues to follow the nominal trajectory.
 
-[Run the example](#quick-start) · [Change the scenario](#change-the-scenario) · [Model notes](docs/model.md) · [Tests](#tests)
+[Run the example](#quick-start) · [Change the scenario](#change-the-scenario) · [Model notes](doc/model.md) · [Tests](#tests)
 
 ## Quick start
 
@@ -48,7 +48,7 @@ At the maneuver time, minimum-propagation-delay routing selects:
 
 After another 20 minutes, the maneuvered satellite is about **273 m** from its nominal position, and the maximum pointing error along the route is about **74 µrad**. The route remains geometrically connected, but its modeled capacity falls near zero because the terminals do not adjust their pointing for the maneuver.
 
-These are results of the synthetic example, not measured terminal performance. The capacity and delay proxies are defined in the [model notes](docs/model.md#link-and-path-metrics).
+These are results of the synthetic example, not measured terminal performance. The capacity and delay proxies are defined in the [model notes](doc/model.md#link-and-path-metrics).
 
 ## Change the scenario
 
@@ -72,7 +72,7 @@ print(result.snapshots[-1].displacement_m)
 
 The default propagator uses Earth point-mass gravity plus J2. Links are checked for range and Earth clearance at each sample, but the candidate edges and route stay fixed. The pointing model assumes that terminals track the nominal line of sight without compensating for the maneuver.
 
-This version does not model link reacquisition, adaptive routing, or traffic queues. See [model notes](docs/model.md) for the equations, units, finite-burn API, and optional Basilisk backend.
+This version does not model link reacquisition, adaptive routing, or traffic queues. See [model notes](doc/model.md) for the equations, units, finite-burn API, and optional Basilisk backend.
 
 The main entry point is [`run_analysis`](src/leo_maneuver_analysis/analysis.py). Orbit propagation, topology and routing, and pointing calculations are separated into [`propagation.py`](src/leo_maneuver_analysis/propagation.py), [`network.py`](src/leo_maneuver_analysis/network.py), and [`pointing.py`](src/leo_maneuver_analysis/pointing.py).
 
