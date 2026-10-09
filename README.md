@@ -1,175 +1,90 @@
 # LEO Maneuver Analysis
 
-A Python toolkit for tracing how a prescribed satellite maneuver changes an
-inter-satellite communication path: orbit propagation → line-of-sight error →
-link quality → path metrics.
+Python code for studying how a satellite maneuver affects inter-satellite pointing and communication along a fixed route.
 
-The included offline example uses a synthetic circular constellation and a
-single transverse impulse. It compares the same nominal route with and without
-the maneuver, exposing the trajectories and intermediate link calculations.
-No accounts, downloaded catalogs, or external datasets are needed to run it.
+The simulation starts from the same constellation and compares two cases: one without a maneuver and one with a velocity impulse. Both use the same route, and terminal pointing continues to follow the nominal trajectory.
+
+[Run the example](#quick-start) · [Change the scenario](#change-the-scenario) · [Model notes](docs/model.md) · [Tests](#tests)
 
 ## Quick start
 
-Use Python 3.10 or newer in a virtual environment. From the repository directory:
+Requires **Python 3.10+**. From the repository directory, preferably in a virtual environment:
 
 ```bash
-python -m pip install ".[plot]"
-python -m leo_maneuver_analysis --config examples/maneuver_impact.json --output runs/demo --plot
+python -m pip install .
+python -m leo_maneuver_analysis --config examples/maneuver_impact.json --output runs/demo
 ```
 
-The simulation and figure generation take a few seconds on a typical desktop.
-To run without plotting, install `.` and omit `--plot`. `leo-maneuver` is an
-equivalent installed command. Paths are relative to the current working
-directory; the package can be used from outside this repository after installation.
+The example uses a synthetic constellation; no external orbital data is needed. Results are written to `runs/demo/`:
 
-The output directory contains:
+```text
+runs/demo/
+├── scenario.json              # Parameters used for the run
+├── maneuver_trajectory.csv    # Nominal and maneuvered states of the affected satellite
+├── link_metrics.csv           # Geometry, pointing error, and modeled link quality
+└── path_metrics.csv           # Route availability and aggregate path metrics
+```
 
-| File | Contents |
-| --- | --- |
-| `scenario.json` | Resolved parameters, including a backend override |
-| `maneuver_trajectory.csv` | Nominal and maneuvered position/velocity of the maneuvering satellite |
-| `link_metrics.csv` | Per-edge geometry, pointing error, and analytical link metrics for both cases |
-| `path_metrics.csv` | Fixed route, status, and aggregate metrics for each snapshot |
-| `maneuver_impact.png` | Optional figure generated from the same analysis |
+For a local plot, install `".[plot]"` instead of `.` and add `--plot` to the run command. This also writes `maneuver_impact.png` to the output directory. `leo-maneuver` is an equivalent installed command.
 
-Generated runs are ignored by Git. Reusing an output directory replaces the
-named exports after they have been staged successfully. Unavailable path metrics
-are blank in CSV files, rather than represented as zero delay or zero loss.
+## Example: a transverse impulse
 
-## Example: a transverse maneuver
+The [example configuration](examples/maneuver_impact.json) places 36 satellites in three orbital planes. Satellite 3 receives a transverse impulse ten minutes into the simulation.
 
-The [scenario](examples/maneuver_impact.json) has 3 planes of 12 satellites at
-550 km altitude and 53° inclination. Adjacent planes have half-slot phasing.
-At 600 s, satellite 3 receives a 0.2 m/s transverse impulse in its local RTN
-frame. States are sampled every 30 s over a 30-minute interval.
+| Parameter | Value |
+| :--- | :--- |
+| Constellation | 3 planes × 12 satellites; half-slot phasing between adjacent planes |
+| Altitude / inclination | 550 km / 53° |
+| Maneuver | 0.2 m/s transverse impulse at 600 s |
+| Duration / sampling | 1,800 s / 30 s |
+| Source → destination | Satellite 0 → satellite 6 |
+| Beam-width parameter | 50 µrad |
 
-At the maneuver time, nominal propagation-delay routing selects
-`0 → 1 → 2 → 3 → 4 → 5 → 6`. That route and its candidate edge set remain
-fixed in both cases; range and Earth clearance are checked again at each sample.
+At the maneuver time, minimum-propagation-delay routing selects:
 
-![Fixed-path pointing error and capacity proxy](docs/maneuver_impact.png)
+```text
+0 → 1 → 2 → 3 → 4 → 5 → 6
+```
 
-After 20 minutes of post-maneuver propagation, the satellite is displaced by
-about 273 m and the maximum pointing error along this path is about 74 µrad.
-The path remains geometrically connected. Under the configured nominal-trajectory
-tracking model, its capacity proxy approaches the model's numerical floor.
-The geometric propagation delay changes only slightly.
+After another 20 minutes, the maneuvered satellite is about **273 m** from its nominal position, and the maximum pointing error along the route is about **74 µrad**. The route remains geometrically connected, but its modeled capacity falls near zero because the terminals do not adjust their pointing for the maneuver.
 
-This result illustrates the sensitivity of a narrow-beam model to an unaccounted
-trajectory change. Updating the terminal's target trajectory or actively
-reacquiring the link would require a different pointing model. Changing the
-impulse, beam width, or source/destination IDs provides a small sensitivity study;
-an off-path maneuver may have little effect on the selected path.
+These are results of the synthetic example, not measured terminal performance. The capacity and delay proxies are defined in the [model notes](docs/model.md#link-and-path-metrics).
 
-## Implementation
+## Change the scenario
 
-| Module | Responsibility |
-| --- | --- |
-| [config](src/leo_maneuver_analysis/config.py) | Immutable scenario parameters, unit conventions, JSON validation |
-| [constellation](src/leo_maneuver_analysis/constellation.py) | Synthetic inertial initial states and plane/slot metadata |
-| [propagation](src/leo_maneuver_analysis/propagation.py) | Propagator protocol, RTN conversion, impulse and finite-burn propagation |
-| [network](src/leo_maneuver_analysis/network.py) | Structured ISL topology, nominal routing, link and path metrics |
-| [pointing](src/leo_maneuver_analysis/pointing.py) | LOS angle and Gaussian pointing/packet-error model |
-| [analysis](src/leo_maneuver_analysis/analysis.py) | Two-case orchestration with a common time grid and route |
-| [export](src/leo_maneuver_analysis/export.py) | CSV output and optional headless plotting |
+Edit the JSON file to change the constellation, impulse, beam width, or endpoints. The impulse components are ordered **radial, transverse, normal**, in m/s.
 
-The modules use explicit state arrays and configuration objects. Importing the
-package does not start an experiment, load catalogs, or write outputs.
+The same analysis is available from Python:
 
 ```python
 from dataclasses import replace
 from leo_maneuver_analysis import load_config, run_analysis
 
 config = load_config("examples/maneuver_impact.json")
-result = run_analysis(replace(config, impulse_rtn_mps=(0.0, 0.1, 0.0)))
+config = replace(config, impulse_rtn_mps=(0.0, 0.1, 0.0))
+result = run_analysis(config)
+
 print(result.route)
-print(result.snapshots[-1].maneuvered.capacity_proxy_mbps)
+print(result.snapshots[-1].displacement_m)
 ```
 
-Position and velocity arrays have shape `(time, satellite, xyz)` in a common
-Earth-centered inertial frame. Units are meters, seconds, m/s, radians, and Mbps;
-inclination in the configuration is explicitly in degrees. Satellite IDs index
-the array rows. The maneuver time is included exactly in the time grid even
-when it is not a multiple of the sampling interval.
+## Model and code
 
-## Models and assumptions
+The default propagator uses Earth point-mass gravity plus J2. Links are checked for range and Earth clearance at each sample, but the candidate edges and route stay fixed. The pointing model assumes that terminals track the nominal line of sight without compensating for the maneuver.
 
-- **Dynamics:** the default `scipy-j2` backend integrates Earth point-mass plus
-  J2 gravity with constant spacecraft mass. The example uses an instantaneous
-  velocity impulse. The propagation API also supports fixed-direction,
-  constant inertial thrust, integrated separately during burn and coasting;
-  there is no attitude, drag, or propellant depletion model.
-- **Topology:** slot-neighbor links within a plane and nearest-neighbor links
-  on adjacent planes. Greedy selection prioritizes intra-plane edges and
-  enforces range, spherical-Earth clearance, and per-node degree limits.
-  Link acquisition, terminal scheduling, and ground links are outside this model.
-- **Pointing:** terminals follow the nominal LOS at each time, without updating
-  it for the maneuver. For angular error θ and beam-width parameter β, the
-  model uses `g = exp(-2(θ/β)²)` and `SNR = SNR₀ × g²`, followed by
-  `BER = 0.5 × erfc(sqrt(SNR))`. Packet errors assume independent bit errors.
-  This is an analytical sensitivity model, not a calibrated optical terminal.
-- **Path metrics:** capacity is the minimum modeled link capacity along the
-  path, and packet success is the product of per-hop success probabilities.
-  Shared-link contention, queues, packet simulation, and adaptive routing are
-  not included. `connected` reports geometric availability, not delivery success.
-- **Retry-weighted delay:** geometric link delay is multiplied by a capped
-  retry factor. This is a diagnostic proxy, not application latency or an ARQ
-  timing model. Packet success has a `1e-12` numerical floor and retry factors
-  are capped at 20 in the example; finite proxy values do not imply useful
-  service when packet error approaches one.
+This version does not model link reacquisition, adaptive routing, or traffic queues. See [model notes](docs/model.md) for the equations, units, finite-burn API, and optional Basilisk backend.
 
-## Optional Basilisk backend
+The main entry point is [`run_analysis`](src/leo_maneuver_analysis/analysis.py). Orbit propagation, topology and routing, and pointing calculations are separated into [`propagation.py`](src/leo_maneuver_analysis/propagation.py), [`network.py`](src/leo_maneuver_analysis/network.py), and [`pointing.py`](src/leo_maneuver_analysis/pointing.py).
 
-```bash
-python -m pip install ".[basilisk]"
-python -m leo_maneuver_analysis --config examples/maneuver_impact.json --output runs/basilisk --backend basilisk
-```
-
-The adapter uses Basilisk's spacecraft module with Earth point-mass gravity and
-constant mass. It does **not** include the default SciPy backend's J2 term, so
-the two models should not be treated as numerically equivalent. Every run
-records its backend and model. Requesting Basilisk without installing it fails
-with an installation message; it does not silently fall back to SciPy.
-
-For this fixed-step adapter, requested sample times and finite-burn durations
-must be multiples of the integration step. The CLI's sampling interval,
-maneuver time, and duration therefore need to align with `integrator_step_s`
-when selecting Basilisk. Misaligned inputs fail explicitly; decrease the step
-to represent a finer time grid.
-
-The optional dependency is pinned to the locally checked version, `bsk==2.11.1`.
-See the [official installation documentation](https://avslab.github.io/basilisk/Install.html)
-for supported platforms and wheel availability.
-
-## Validation
+## Tests
 
 ```bash
 python -m pip install ".[dev]"
 python -m pytest
 ```
 
-Tests cover RTN geometry, zero-maneuver consistency, impulse continuity,
-finite-burn behavior, topology constraints, weighted routing and disconnection,
-pointing sensitivity, path aggregation, invalid configurations, and CLI exports.
-Optional Basilisk tests are skipped unless that dependency is installed.
-GitHub Actions checks the default backend on Python 3.10 and 3.12.
+Tests cover maneuver dynamics, topology constraints, routing, pointing sensitivity, path metrics, configuration errors, and CSV exports. Basilisk tests are skipped when the optional dependency is not installed.
 
-The local reference environment uses Python 3.12, NumPy 2.2.4, SciPy 1.14.1,
-NetworkX 3.3 and Matplotlib 3.9.4. A separate clean installation was also checked
-with NumPy 2.5.3, SciPy 1.18.1, NetworkX 3.7, Matplotlib 3.11.2, and Pytest 9.1.1.
-Optional dynamics checks use Basilisk 2.11.1. The README figure is generated by
-the default SciPy example. The GitHub-hosted CI will run when the repository is uploaded.
+---
 
-## Author and components
-
-Maintained by **Haoyuan Zhao**. The propagation, topology, and analytical link
-calculations were extracted and reorganized from satellite-network research code
-into this standalone workflow. The synthetic fixture contains no operational
-spacecraft records or measured performance claims.
-
-Numerical integration uses [SciPy](https://scipy.org/), array operations use
-[NumPy](https://numpy.org/), routing uses [NetworkX](https://networkx.org/), and
-the optional dynamics adapter uses [Basilisk](https://avslab.github.io/basilisk/).
-These dependencies retain their respective licenses. This repository currently
-does not include a code license.
+**Haoyuan Zhao** · Adapted from satellite-network research code. No code license is included in this repository.
